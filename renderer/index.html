@@ -1,1 +1,44 @@
-<h1>Hello World!</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <head>
+        <meta http-equiv="Content-Security-Policy" 
+        content="default-src 'self'; 
+        script-src 'self';
+        font-src 'self' https://fonts.gstatic.com;
+        style-src 'self' https://fonts.googleapis.com">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="./js/jquery-3.7.0.min.js"></script>
+        <script src="./js/renderer.js" defer></script>
+        <script src="./js/bootstrap.min.js"></script>
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons"
+          rel="stylesheet">
+        <link rel="stylesheet" href="./css/bootstrap.min.css">
+        <link rel="stylesheet" href="./css/styles.css">
+        <title>PenSave: Backup Tool 0.8</title>
+    </head>
+</head>
+<body class="bg-dark text-light">
+    <div class="container mt-5">
+        <div class="row">
+            <img id="alpha" class="mx-auto d-block" src="./imgs/FFXIV_Alpha_Render_03.webp" alt="">
+        </div>
+        <div class="row">
+            <h4 class="mx-auto d-block mt-3" id="description">PENUMBRA BACKUP TOOL</h4>
+        </div>
+        <div class="row">
+            <div class="col mt-5 text-center">
+                <form id="backup-form">
+                    <button type="submit" class="btn btn3d btn-primary center text-dark" id="description">BACKUP</button>
+                </form>
+            </div>
+            <div class="col mt-5 text-center">
+                <form id="restore-form">
+                    <button type="submit" class="btn btn3d btn-success text-dark" id="description">RESTORE</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
