@@ -5,8 +5,11 @@ const os = require('os');
 const ProgressBar = require('electron-progressbar');
 const JSzip = require('jszip');
 
+let win;
+let progressBar;
+
 const createWindow = () => {
-    const win = new BrowserWindow({
+    win = new BrowserWindow({
         autoHideMenuBar: true,
         width: 800,
         height: 500,
@@ -25,6 +28,23 @@ const createWindow = () => {
 const appDataPath = app.getPath('appData');
 console.log(appDataPath);
 
+// Function to open file explorer dialog and return selected file path
+
+function openFFModsExplorer() {
+    return dialog.showOpenDialogSync(win, {
+        title: 'Select FFXIV Mod folder',
+        properties: ['openDirectory']
+    });
+}
+
+// Function to open directory picker dialog and return selected directory path
+function openDirectoryPicker() {
+    return dialog.showOpenDialogSync(win, {
+        title: 'Select Backup Destination',
+        properties: ['openDirectory']
+    });
+}
+
 //Function to create a zip file with progress bar
 
 async function zipProgressBar(filePaths, zipPath) {
@@ -32,7 +52,7 @@ async function zipProgressBar(filePaths, zipPath) {
     const totalFiles = filePaths.length;
   
     // Create a progress bar with total number of files
-    const progressBar = new ProgressBar({
+    progressBar = new ProgressBar({
       text: 'Creating backup...',
       detail: 'Processing files',
       browserWindow: {
@@ -44,7 +64,7 @@ async function zipProgressBar(filePaths, zipPath) {
         minimizable: false,
         maximizable: false,
         width: 400,
-        height: 150,
+        height: 200,
         autoHideMenuBar: true
       }
     });
@@ -68,9 +88,9 @@ async function zipProgressBar(filePaths, zipPath) {
         }
       } else {
         // Add file to the zip with relative directory structure
-        const fileData = await fs.promises.readFile(filePath);
+        const fileStream = fs.createReadStream(filePath);
         const relativePath = path.relative(basePath, filePath);
-        zip.file(relativePath, fileData);
+        zip.file(relativePath, fileStream);
       }
   
       updateProgressBar(filePaths.indexOf(filePath));
@@ -81,11 +101,43 @@ async function zipProgressBar(filePaths, zipPath) {
       await addFileToZip(filePath, appDataPath);
     }
   
-    const content = await zip.generateAsync({ type: 'nodebuffer' });
-    await fs.promises.writeFile(zipPath, content);
+    // Create the destination directory if it doesn't exist
+    const destinationDir = path.dirname(zipPath);
+    if (!(await fs.promises.stat(destinationDir).catch(() => null))) {
+      await fs.promises.mkdir(destinationDir, { recursive: true });
+    }
   
-    progressBar.close();
+    // Cleanup previous zip file
+    try {
+      await fs.promises.unlink(zipPath);
+    } catch (error) {
+      // Ignore error if the file doesn't exist
+    }
+  
+    // Write the zip file
+    return new Promise((resolve, reject) => {
+      zip
+        .generateNodeStream({ type: 'nodebuffer', streamFiles: true })
+        .pipe(fs.createWriteStream(zipPath))
+        .on('finish', resolve)
+        .on('error', reject);
+    });
   }
+
+  
+
+  //check to see if files exist before zipping
+  async function checkFilesExist(filePaths) {
+    for (const filePath of filePaths) {
+        try {
+            await fs.promises.access(filePath, fs.constants.F_OK);
+        } catch (error) {
+            // File does not exist
+            return false;
+        }
+    }
+    return true;
+}
 
 // Example usage - Writing a test to function off of. 
 const filesToBackup = [
@@ -94,7 +146,41 @@ const filesToBackup = [
     `${appDataPath}/XIVLauncher/pluginConfigs/Penumbra`
 ]
 
-const backupZipPath = 'C:/Users/kniem/Desktop/pensave.zip';
+//Listen for backup:start and run the zipping process, send an alert on success or failure.
+ipcMain.on('backup:start', async (event) => {
+    const filesExist = await checkFilesExist(filesToBackup)
+
+    if (!filesExist) {
+        //Display a warning to Electron
+        win.webContents.send('nofiles')
+    }else {
+        const selectedModsFile = openFFModsExplorer();
+        const selectedDirectory = openDirectoryPicker();
+
+    if (selectedModsFile && selectedModsFile.length > 0) {
+        // Add the selected file to the filesToBackup array
+        filesToBackup.push(selectedModsFile[0]);
+        
+        if (selectedDirectory && selectedDirectory.length > 0) {
+            const backupDiretory = selectedDirectory[0];
+
+            const backupZipPath = path.join(backupDiretory, 'pensave.zip');
+            
+            zipProgressBar(filesToBackup, backupZipPath)
+            .then(() => {
+                console.log('Backup Completed')
+                win.webContents.send('backup:done');
+                progressBar.close();
+            })
+            .catch((error) => {
+                console.error(error);
+                win.webContents.send('backup:failed');
+                progressBar.close();
+            })
+        }
+        }
+    }
+})
 
 
 // Check Operating System being ran currently
@@ -115,11 +201,4 @@ app.whenReady().then(() => {
     }
     console.log('Not a mac, starting.');
     createWindow();
-    // zipProgressBar(filesToBackup, backupZipPath)
-    //     .then(() => {
-    //         console.log('Backup created successfully!');
-    //     })
-    //     .catch((error) => {
-    //         console.error('Failed to create backup:', error);
-    //     })
 })
