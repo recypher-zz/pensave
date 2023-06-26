@@ -124,6 +124,16 @@ async function zipProgressBar(filePaths, zipPath) {
     });
   }
 
+  //Function to open the zip file that we created
+
+  function openZipFile() {
+    return dialog.showOpenDialogSync(win, {
+        title: 'Select Backup Zip File',
+        filters: [{name: 'Zip Files', extensions: ['zip'] }],
+        properties: ['openFile']
+    });
+  }
+
   
 
   //check to see if files exist before zipping
@@ -179,6 +189,75 @@ ipcMain.on('backup:start', async (event) => {
             })
         }
         }
+    }
+})
+
+ipcMain.on('restore:start', async (event) => {
+    const selectedZipFile = openZipFile();
+
+    if (selectedZipFile && selectedZipFile.length > 0) {
+        const zipFilePath = selectedZipFile[0];
+
+        //Create a progress bar
+        progressBar = new ProgressBar({
+            text: 'Extracting backup...',
+            detail: 'Extracting files',
+            browserWindow: {
+                webPreferences: {
+                    nodeIntegration: true
+                },
+                title: 'Extraction Progress',
+                closable: false,
+                minimizable: false,
+                maximizable: false,
+                width: 400,
+                height: 150,
+                autoHideMenuBar: true
+            }
+        });
+
+        try {
+            const zip = new JSzip();
+            const extractedFiles = [];
+          
+            // Create a readable stream to read the zip file
+            const readStream = fs.createReadStream(zipFilePath);
+            let fileData = Buffer.alloc(0);
+          
+            // Load the zip data by reading the stream in chunks
+            await new Promise((resolve, reject) => {
+              readStream.on('data', (chunk) => {
+                fileData = Buffer.concat([fileData, chunk]);
+              });
+          
+              readStream.on('end', () => {
+                resolve();
+              });
+          
+              readStream.on('error', (error) => {
+                reject(error);
+              });
+            });
+          
+            // Load the zip data
+            await zip.loadAsync(fileData);
+          
+            // Extract each file to the specified location
+            for (const filePath of filesToBackup) {
+              const fileName = path.basename(filePath);
+              const fileData = await zip.file(fileName).async('nodebuffer');
+              await fs.promises.writeFile(filePath, fileData);
+              extractedFiles.push(filePath);
+              progressBar.detail = `Extracted ${extractedFiles.length} of ${filesToBackup.length} files`;
+            }
+          
+            progressBar.close();
+            win.webContents.send('restore:done');
+          } catch (error) {
+            console.error(error);
+            progressBar.close();
+            win.webContents.send('restore:failed');
+          }
     }
 })
 
