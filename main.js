@@ -45,6 +45,20 @@ function openDirectoryPicker() {
     });
 }
 
+// Function to select restoration path for FFXIV Mods folder
+
+async function selectDestinationPath() {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory']
+  });
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0];
+  } else {
+    throw new Error('Destination path not selected');
+  }
+}
+
 //Function to create a zip file with progress bar
 
 async function zipProgressBar(filePaths, zipPath) {
@@ -192,74 +206,104 @@ ipcMain.on('backup:start', async (event) => {
     }
 })
 
-ipcMain.on('restore:start', async (event) => {
-    const selectedZipFile = openZipFile();
+// ipcMain.on('restore:start', async (event) => {
+//     const selectedZipFile = openZipFile();
 
-    if (selectedZipFile && selectedZipFile.length > 0) {
-        const zipFilePath = selectedZipFile[0];
+//     if (selectedZipFile && selectedZipFile.length > 0) {
+//         const zipFilePath = selectedZipFile[0];
 
-        //Create a progress bar
-        progressBar = new ProgressBar({
-            text: 'Extracting backup...',
-            detail: 'Extracting files',
-            browserWindow: {
-                webPreferences: {
-                    nodeIntegration: true
-                },
-                title: 'Extraction Progress',
-                closable: false,
-                minimizable: false,
-                maximizable: false,
-                width: 400,
-                height: 150,
-                autoHideMenuBar: true
-            }
-        });
+//         //Create a progress bar
+//         progressBar = new ProgressBar({
+//             text: 'Extracting backup...',
+//             detail: 'Extracting files',
+//             browserWindow: {
+//                 webPreferences: {
+//                     nodeIntegration: true
+//                 },
+//                 title: 'Extraction Progress',
+//                 closable: false,
+//                 minimizable: false,
+//                 maximizable: false,
+//                 width: 400,
+//                 height: 150,
+//                 autoHideMenuBar: true
+//             }
+//         });
 
-        try {
-            const zip = new JSzip();
-            const extractedFiles = [];
+//         try {
+//             const zip = new JSzip();
+//             const extractedFiles = [];
           
-            // Create a readable stream to read the zip file
-            const readStream = fs.createReadStream(zipFilePath);
-            let fileData = Buffer.alloc(0);
+//             // Create a readable stream to read the zip file
+//             const readStream = fs.createReadStream(zipFilePath);
+//             let fileData = Buffer.alloc(0);
           
-            // Load the zip data by reading the stream in chunks
-            await new Promise((resolve, reject) => {
-              readStream.on('data', (chunk) => {
-                fileData = Buffer.concat([fileData, chunk]);
-              });
+//             // Load the zip data by reading the stream in chunks
+//             await new Promise((resolve, reject) => {
+//               readStream.on('data', (chunk) => {
+//                 fileData = Buffer.concat([fileData, chunk]);
+//               });
           
-              readStream.on('end', () => {
-                resolve();
-              });
+//               readStream.on('end', () => {
+//                 resolve();
+//               });
           
-              readStream.on('error', (error) => {
-                reject(error);
-              });
-            });
+//               readStream.on('error', (error) => {
+//                 reject(error);
+//               });
+//             });
           
-            // Load the zip data
-            await zip.loadAsync(fileData);
+//             // Load the zip data
+//             await zip.loadAsync(fileData);
+
+//             // Prompt the user to seleect their FFXIV Mods folder from the zip
+//             const selectedFFXIVModsFolder = await dialog.showOpenDialog({
+//               title: 'Select FFXIV Mods Folder',
+//               buttonLabel: 'Select',
+//               properties: ['openDirectory']
+//             })
+
+//             if (selectedFFXIVModsFolder && selectedFFXIVModsFolder.filePaths.length > 0) {
+//               const ffxivModsFolder = selectedFFXIVModsFolder.filePaths[0];
+
+//               // Prompt the user to select the dest path for the FFXIV Mods folder
+//               const ffxivModsDestination = await selectDestinationPath();
+
+//               // Calculate the relative path of the selected FFXIV Mods folder within the zip
+//               const relativePath = path.relative(appDataPath, ffxivModsFolder);
+
+//               //Extract the selected FFXIV Mods folder to the specified location
+//               const ffxivModsData = await zip.file(relativePath).async('nodebuffer');
+//               const ffxivModsFileName = path.basename(ffxivModsFolder);
+//               const ffxivModsFilePath = path.join(ffxivModsDestination, ffxivModsFileName);
+//               await fs.promises.writeFile(ffxivModsFilePath, ffxivModsData);
+//               extractedFiles.push(ffxivModsFilePath);
+//               progressBar.detail = `Extracted ${extractedFiles.length} of ${filesToBackup.length} files`;
+//             } else {
+//               throw new Error('FFXIV Mods folder not selected from the zip file.');
+//             }
           
-            // Extract each file to the specified location
-            for (const filePath of filesToBackup) {
-              const fileName = path.basename(filePath);
-              const fileData = await zip.file(fileName).async('nodebuffer');
-              await fs.promises.writeFile(filePath, fileData);
-              extractedFiles.push(filePath);
-              progressBar.detail = `Extracted ${extractedFiles.length} of ${filesToBackup.length} files`;
-            }
+//             // Extract each file to the specified location
+//             for (const filePath of filesToBackup) {
+//               const fileName = path.basename(filePath);
+//               const fileData = await zip.file(fileName).async('nodebuffer');
+//               await fs.promises.writeFile(filePath, fileData);
+//               extractedFiles.push(filePath);
+//               progressBar.detail = `Extracted ${extractedFiles.length} of ${filesToBackup.length} files`;
+//               progressBar.on('progress', (value) => {
+//                 progressBar.detail = `Extracted ${extractedFiles.length} of ${filesToBackup.length} files`;
+//               });
+//             }
           
-            progressBar.close();
-            win.webContents.send('restore:done');
-          } catch (error) {
-            console.error(error);
-            progressBar.close();
-            win.webContents.send('restore:failed');
-          }
-    }
-})
+//             progressBar.close();
+//             win.webContents.send('restore:done');
+//           } catch (error) {
+//             console.error(error);
+//             progressBar.close();
+//             win.webContents.send('restore:failed');
+//           }
+//     }
+// })
 
 
 // Check Operating System being ran currently
